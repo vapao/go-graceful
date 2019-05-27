@@ -42,6 +42,31 @@ func ListenAndServe(server *http.Server, pidFile string) {
 	log.Println("graceful shutdown")
 }
 
+func ListenAndServeTLS(server *http.Server, certFile, keyFile, pidFile string) {
+	err := savePidToFile(pidFile)
+	if err != nil {
+		log.Fatalf("Update pid file error: %v", err)
+	}
+	if os.Getenv("_GRACEFUL_RESTART") == "true" {
+		f := os.NewFile(3, "")
+		listener, err = net.FileListener(f)
+		log.Printf("Starting server listening on %s ... (graceful mode)", server.Addr)
+	} else {
+		listener, err = net.Listen("tcp", server.Addr)
+		log.Printf("Starting server listening on %s ...", server.Addr)
+	}
+
+	if err != nil {
+		log.Fatalf("listener error: %v", err)
+	}
+
+	go func() {
+		log.Println(server.ServeTLS(listener, certFile, keyFile))
+	}()
+	signalHandler(server)
+	log.Println("graceful shutdown")
+}
+
 func reload() error {
 	tl, ok := listener.(*net.TCPListener)
 	if !ok {
